@@ -22,6 +22,7 @@ Read in order for the full story, or jump to a topic:
 | 08 | [Next Steps & Roadmap](08_next_steps.md) | The plan to reach a strong F₀.₅, with rationale and alternatives |
 | 09 | [Blocking v2](09_blocking_v2.md) | Candidate generation: experiments, the recall/volume trade-off, IDF top-N via sparse matmul (94.5% recall, 0.66B pairs) |
 | 10 | [Feature Engineering](10_features.md) | The 29 pairwise features, labeled dataset construction, and feature-quality validation |
+| 11 | [Matching Model & F₀.₅ Tuning](11_matching_model.md) | Model bake-off (XGBoost 0.9206), honest macro-F₀.₅ eval, threshold, importances |
 
 ## Project status
 
@@ -31,8 +32,9 @@ Read in order for the full story, or jump to a topic:
 | 2. Data cleaning & normalization | ✅ Complete & validated |
 | 3. Candidate generation (blocking) | ✅ v2 complete (94.5% recall, 0.66B candidates) |
 | 3.5 Feature engineering | ✅ Complete (29 features; 10M train / 18M val rows) |
-| 4. Matching model (classifier) | 🔜 Next |
-| 5. Threshold tuning for F₀.₅ + submission | ⏳ Pending |
+| 4. Matching model (classifier) | ✅ XGBoost, macro F₀.₅ = 0.9206 (P 0.959 / R 0.849) |
+| 5. Threshold tuning for F₀.₅ | ✅ Global thr ≈ 0.99 (done in Stage 5 eval) |
+| 6. Test inference + submission package | 🔜 Next |
 
 ## One-paragraph summary
 

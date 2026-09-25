@@ -22,3 +22,7 @@ data/interim/
 # Large regenerable candidate/output TSVs
 output/*.tsv
 data/interim/
+
+# Trained model binaries (regenerable via train_model.py)
+models/xgb.json
+models/lgbm.txt
