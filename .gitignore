@@ -18,3 +18,7 @@ venv/
 data/processed/
 data/interim/
 *.parquet
+
+# Large regenerable candidate/output TSVs
+output/*.tsv
+data/interim/

@@ -86,6 +86,30 @@ shows it is needed.
 running record also prevents re-deriving decisions and makes the final
 Documentation_template.md a compilation task, not a scramble.
 
+### D13 — Blocking v2: IDF-weighted top-N via sparse matmul
+**Context:** v1 reached 94.9% recall but implied ~172B comparisons (unusable).
+**Options explored (all measured on full train GT):** DF pruning; composite keys
+(name+state, name+street#); conjunctive ≥K shared keys; top-N by raw count; top-N
+by IDF-weighted shared score.
+**Findings:** DF-pruning name tokens alone hurts recall; **address-token blocking
+is the recovery lever and fixes India**; LSH adds only +0.4% (dropped); conjunctive
+≥2 is tractable (849M) but loses recall (92.8%); **IDF-weighted top-N beats raw
+count** at every N.
+**Decision:** rank candidates by summed IDF of shared kept keys, keep **top-N=300**
+per S1, computed with **batched sparse matrix multiply** for scale.
+**Result:** **94.48% recall at 0.66B candidate pairs** (~1/260th of v1's volume),
+~18 min. N tunes recall/compute continuously (N=500 → 95.2%).
+**Why best:** IDF ranking captures evidence *specificity* (correlates with true
+matching far better than a raw count), gives a hard per-S1 volume bound, and
+defers precision to the downstream classifier.
+
+### D14 — Cache blocking keys to disk (`precompute_keys`)
+**Decision:** precompute each record's keyset once into compact CSR int arrays
+(`data/interim/keys_*.npz`), type encoded in low bits.
+**Why:** experiments and candidate generation then load arrays instead of
+recomputing keys — turned ~10-min iterations into seconds and enabled the many
+blocking experiments in D13.
+
 ---
 
 *(append future decisions below)*

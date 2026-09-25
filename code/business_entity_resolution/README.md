@@ -34,11 +34,22 @@ name_core, name_legal, addr_canon, street_number, state, is_domain, is_native`.
 
 Throughput ≈ 150–210k rows/s (8 workers); full 24.2M records ≈ 2.5 min.
 
-### 2. Candidate generation / blocking  *(next)*
+### 2. Candidate generation / blocking  (`src/precompute_keys.py`, `src/generate_candidates.py`)
 
-Multi-key blocking (name tokens, street#+state, address tokens, name n-gram
-LSH) with document-frequency pruning of non-discriminative keys. Emits
-`output/candidate_pairs.tsv`.
+Multi-key blocking (composite name+state / name+street# keys, street#+state,
+name & address tokens) with document-frequency pruning, then **IDF-weighted
+top-N** candidate ranking via batched sparse matrix multiply. Full design and
+experiments in `docs/09_blocking_v2.md`.
+
+```bash
+python code/business_entity_resolution/src/precompute_keys.py --split train
+python code/business_entity_resolution/src/generate_candidates.py \
+    --split train --topn 300 --out output/candidate_pairs_train.tsv \
+    --gt dataset/train/train_ground_truth.tsv
+```
+
+Measured on train: **94.48% recall** at **0.66B** candidate pairs (300/S1),
+~18 min. `--topn 500` → ~95.2% at 1.1B. For submission, rerun with `--split test`.
 
 ### 3. Matching model  *(next)*
 
