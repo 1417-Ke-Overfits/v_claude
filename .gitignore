@@ -12,3 +12,9 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Project venv & processed data
+.venv/
+data/processed/
+data/interim/
+*.parquet
