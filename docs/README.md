@@ -21,6 +21,7 @@ Read in order for the full story, or jump to a topic:
 | 07 | [Decisions Log](07_decisions_log.md) | Chronological record of every significant decision and its rationale |
 | 08 | [Next Steps & Roadmap](08_next_steps.md) | The plan to reach a strong F₀.₅, with rationale and alternatives |
 | 09 | [Blocking v2](09_blocking_v2.md) | Candidate generation: experiments, the recall/volume trade-off, IDF top-N via sparse matmul (94.5% recall, 0.66B pairs) |
+| 10 | [Feature Engineering](10_features.md) | The 29 pairwise features, labeled dataset construction, and feature-quality validation |
 
 ## Project status
 
@@ -29,6 +30,7 @@ Read in order for the full story, or jump to a topic:
 | 1. Deep dataset understanding (EDA) | ✅ Complete |
 | 2. Data cleaning & normalization | ✅ Complete & validated |
 | 3. Candidate generation (blocking) | ✅ v2 complete (94.5% recall, 0.66B candidates) |
+| 3.5 Feature engineering | ✅ Complete (29 features; 10M train / 18M val rows) |
 | 4. Matching model (classifier) | 🔜 Next |
 | 5. Threshold tuning for F₀.₅ + submission | ⏳ Pending |
 
