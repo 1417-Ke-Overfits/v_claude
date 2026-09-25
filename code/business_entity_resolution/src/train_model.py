@@ -19,7 +19,7 @@ import numpy as np
 import pyarrow.parquet as pq
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from features import FEATURE_NAMES  # noqa: E402
+from features import ALL_FEATURE_NAMES as FEATURE_NAMES  # noqa: E402
 
 PROC = "data/processed"
 
@@ -72,6 +72,12 @@ def evaluate(name, scores, val_tbl, gt_full, s1_country_map, thresholds):
         group_country[gi] = CC.get(s1_country_map.get(s, "?"), 3)
     F_all, P_all, R_all = f05_matrix(s1_idx, scores, labels, total_true,
                                      n_groups, thresholds)
+    # LENIENT eval: recall denominator = candidate-present true matches only
+    # (ignores blocking misses) — to compare with evals that don't penalise
+    # blocking. The gap between this and the honest number = the blocking tax.
+    total_true_cand = np.bincount(s1_idx[labels == 1], minlength=n_groups).astype(np.float64)
+    Fc, _, _ = f05_matrix(s1_idx, scores, labels, total_true_cand, n_groups, thresholds)
+    lenient = float(Fc.mean(axis=1).max())
     inv = {0: "US", 1: "India", 2: "France", 3: "?"}
     # --- global single threshold ---
     macro_by_thr = F_all.mean(axis=1)
@@ -90,7 +96,7 @@ def evaluate(name, scores, val_tbl, gt_full, s1_country_map, thresholds):
     pc_macro = float(F_best_per_group.mean())
     pcs = "  ".join(f"{k}:thr={v[0]:.3f}/F={v[1]:.4f}" for k, v in per_country_thr.items())
     print(f"[{name}] GLOBAL F0.5={g_macro:.4f} @thr={g_thr:.3f} (P={gP:.3f} R={gR:.3f}) | "
-          f"PER-COUNTRY F0.5={pc_macro:.4f}", flush=True)
+          f"PER-COUNTRY F0.5={pc_macro:.4f} | LENIENT(no-blocking-penalty)={lenient:.4f}", flush=True)
     print(f"        per-country: {pcs}", flush=True)
     return max(g_macro, pc_macro), g_thr, per_country_thr, n_groups
 

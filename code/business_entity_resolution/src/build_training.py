@@ -83,9 +83,11 @@ def main():
             pos[int(s1.split('-', 1)[1])] = set(rest.split(",")) if rest.strip() else set()
     log(f"gt entities {len(pos):,}")
 
+    from features import compute_relative, ALL_FEATURE_NAMES, REL_FEATURE_NAMES
     schema = pa.schema([("s1", pa.string()), ("cand", pa.string()),
                         ("label", pa.int8())] +
-                       [(n, pa.float32()) for n in FEATURE_NAMES])
+                       [(n, pa.float32()) for n in ALL_FEATURE_NAMES])
+    NF = len(ALL_FEATURE_NAMES)
     wtr_tr = pq.ParquetWriter(args.out_train, schema, compression="zstd")
     wtr_va = pq.ParquetWriter(args.out_val, schema, compression="zstd")
 
@@ -99,42 +101,75 @@ def main():
             return
         cols = list(zip(*rows))
         arrays = [pa.array(cols[0]), pa.array(cols[1]), pa.array(cols[2], type=pa.int8())]
-        for j in range(len(FEATURE_NAMES)):
+        for j in range(NF):
             arrays.append(pa.array(cols[3 + j], type=pa.float32()))
         writer.write_table(pa.table(arrays, schema=schema))
         buf[kind] = []
 
-    def prep_unique(table, rows_needed, s3):
-        """Take unique row indices once, prep once -> {row: prepped}."""
-        uniq = sorted(set(rows_needed))
-        preps = prep_rows(table, uniq, s3) if uniq else []
-        return {r: p for r, p in zip(uniq, preps)}
+    def core_set(name_core):
+        return frozenset(name_core.split()) if name_core else frozenset()
 
-    # Accumulate a chunk of S1 (with their emit lists), then batch-take & prep.
     CHUNK = 4000
-    chunk = []  # list of (s1, s1num, is_val, gtset, emit_ok, srcs)
+    chunk = []  # (s1, s1num, is_val, gtset, cands_all)
 
     def process_chunk():
         if not chunk:
             return
-        need1, need2, need3 = [], [], []
-        for _, s1num, _, _, emit_ok, _ in chunk:
-            need1.append(row1[s1num])
-            for c in emit_ok:
-                (need2 if c[1] == '2' else need3).append(int(c.split('-', 1)[1]))
-        # need2/need3 hold id_nums -> convert to rows
-        rows2 = [row2[n] for n in need2]; rows3 = [row3[n] for n in need3]
-        P1 = prep_unique(t1, need1, False)
-        P2 = prep_unique(t2, rows2, False)
-        P3 = prep_unique(t3, rows3, True)
-        for s1, s1num, is_val, gtset, emit_ok, _ in chunk:
+        # --- gather ALL candidate rows for cheap core sets (relative features) ---
+        rows2_all, rows3_all = [], []
+        for _, _, _, _, cands in chunk:
+            for c in cands:
+                (rows2_all if c[1] == '2' else rows3_all).append(int(c.split('-', 1)[1]))
+        u2 = sorted(set(row2[n] for n in rows2_all))
+        u3 = sorted(set(row3[n] for n in rows3_all))
+        nc2 = dict(zip(u2, t2.take(pa.array(u2)).column("name_core").to_pylist())) if u2 else {}
+        nc3 = dict(zip(u3, t3.take(pa.array(u3)).column("name_core").to_pylist())) if u3 else {}
+        core2 = {r: core_set(v) for r, v in nc2.items()}
+        core3 = {r: core_set(v) for r, v in nc3.items()}
+
+        # --- decide WRITTEN candidates and full-prep only those ---
+        need1 = [row1[s1num] for _, s1num, _, _, _ in chunk]
+        writes = []  # per S1: list of (cand, label, full_b_key)
+        need2w, need3w = [], []
+        for s1, s1num, is_val, gtset, cands in chunk:
+            if is_val:
+                sel = cands
+            else:
+                p = [c for c in cands if c in gtset]
+                ng = [c for c in cands if c not in gtset]
+                if len(ng) > args.neg_per_s1:
+                    ng = random.sample(ng, args.neg_per_s1)
+                sel = p + ng
+            sset = set(sel)
+            writes.append((s1, s1num, is_val, gtset, cands, sset))
+            for c in sel:
+                num = int(c.split('-', 1)[1])
+                (need2w if c[1] == '2' else need3w).append(num)
+        P1 = {r: p for r, p in zip(sorted(set(need1)),
+              prep_rows(t1, sorted(set(need1)), False))} if need1 else {}
+        rw2 = sorted(set(row2[n] for n in need2w)); rw3 = sorted(set(row3[n] for n in need3w))
+        P2 = {r: p for r, p in zip(rw2, prep_rows(t2, rw2, False))} if rw2 else {}
+        P3 = {r: p for r, p in zip(rw3, prep_rows(t3, rw3, True))} if rw3 else {}
+
+        for s1, s1num, is_val, gtset, cands, sset in writes:
             a = P1[row1[s1num]]
+            # relative features over ALL candidates (cheap core sets)
+            cand_cores, cand_s3 = [], []
+            for c in cands:
+                num = int(c.split('-', 1)[1])
+                if c[1] == '2':
+                    cand_cores.append(core2.get(row2[num], frozenset())); cand_s3.append(False)
+                else:
+                    cand_cores.append(core3.get(row3[num], frozenset())); cand_s3.append(True)
+            rel = compute_relative(a["core"], cand_cores, cand_s3)
             kind = "val" if is_val else "train"
-            for c in emit_ok:
+            for i, c in enumerate(cands):
+                if c not in sset:
+                    continue
                 num = int(c.split('-', 1)[1])
                 b = P2[row2[num]] if c[1] == '2' else P3[row3[num]]
                 lab = 1 if c in gtset else 0
-                buf[kind].append((s1, c, lab, *pair_features(a, b)))
+                buf[kind].append((s1, c, lab, *pair_features(a, b), *rel[i]))
         if len(buf["train"]) >= BUF:
             flush("train", wtr_tr)
         if len(buf["val"]) >= BUF:
@@ -149,7 +184,9 @@ def main():
             s1num = int(s1.split('-', 1)[1])
             if row1.get(s1num) is None or not rest.strip():
                 continue
-            cands = [c for c in rest.split(",") if c]
+            cands = [c for c in rest.split(",") if c and
+                     (row2.get(int(c.split('-', 1)[1])) if c[1] == '2'
+                      else row3.get(int(c.split('-', 1)[1]))) is not None]
             if not cands:
                 continue
             is_val = val_hash(s1num)
@@ -157,20 +194,7 @@ def main():
                 continue
             if not is_val and n_tr_s1 >= args.n_train_s1:
                 continue
-            gtset = pos.get(s1num, set())
-            if is_val:
-                emit = cands
-            else:
-                p = [c for c in cands if c in gtset]
-                n = [c for c in cands if c not in gtset]
-                random.shuffle(n)
-                emit = p + n[:args.neg_per_s1]
-            emit_ok = [c for c in emit
-                       if (row2.get(int(c.split('-', 1)[1])) if c[1] == '2'
-                           else row3.get(int(c.split('-', 1)[1]))) is not None]
-            if not emit_ok:
-                continue
-            chunk.append((s1, s1num, is_val, gtset, emit_ok, None))
+            chunk.append((s1, s1num, is_val, pos.get(s1num, set()), cands))
             if is_val:
                 n_va_s1 += 1
             else:

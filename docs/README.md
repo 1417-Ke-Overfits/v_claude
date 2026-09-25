@@ -23,6 +23,7 @@ Read in order for the full story, or jump to a topic:
 | 09 | [Blocking v2](09_blocking_v2.md) | Candidate generation: experiments, the recall/volume trade-off, IDF top-N via sparse matmul (94.5% recall, 0.66B pairs) |
 | 10 | [Feature Engineering](10_features.md) | The 29 pairwise features, labeled dataset construction, and feature-quality validation |
 | 11 | [Matching Model & F₀.₅ Tuning](11_matching_model.md) | Model bake-off (XGBoost 0.9206), honest macro-F₀.₅ eval, threshold, importances |
+| 12 | [Iteration Experiments](12_iteration_experiments.md) | N-sweep (no help), relative+cross-source features (+0.002), and the honest-vs-lenient eval reframe |
 
 ## Project status
 

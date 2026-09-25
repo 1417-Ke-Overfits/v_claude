@@ -35,6 +35,60 @@ FEATURE_NAMES = [
 ]
 N_FEATURES = len(FEATURE_NAMES)
 
+# Relative / competitive features — computed per S1 across ALL its candidates,
+# so they need cross-candidate context (added in build_training, not pair_features):
+#   namejac_rank        : rank of this cand by name-core Jaccard to S1 (0=best), normalised
+#   is_top_namejac      : 1 if it is the single best name match for this S1
+#   namejac_margin      : its name Jaccard minus the best OTHER candidate's
+#   other_src_best      : best name-Jaccard-to-S1 among OTHER-source candidates
+#                         (cross-source corroboration: does the other source also match S1?)
+#   cross_twin          : 1 if it shares a name signature with an other-source candidate
+#                         (both S2 & S3 point at the same business -> strong)
+#   n_cands_log         : log(1+#candidates for this S1) — context on crowding
+REL_FEATURE_NAMES = [
+    "namejac_rank", "is_top_namejac", "namejac_margin",
+    "other_src_best", "cross_twin", "n_cands_log",
+]
+ALL_FEATURE_NAMES = FEATURE_NAMES + REL_FEATURE_NAMES
+
+
+def compute_relative(a_core, cand_cores, cand_s3):
+    """Relative/competitive + cross-source features over ALL of one S1's
+    candidates, computed from cheap core-token sets only (no full prep needed).
+
+    a_core     : S1 core token frozenset
+    cand_cores : list of each candidate's core token frozenset
+    cand_s3    : list of bools (candidate is from Source 3)
+    Returns a list of REL feature vectors aligned to the candidates.
+    """
+    import math
+    n = len(cand_cores)
+    njac = [(_jac(a_core, cc)) for cc in cand_cores]
+    sigs = []
+    for cc in cand_cores:
+        toks = sorted(cc)
+        sigs.append("|".join(toks[:2]) if toks else "")
+    sig_src = {}
+    for i in range(n):
+        sig_src.setdefault(sigs[i], set()).add(bool(cand_s3[i]))
+    order = sorted(range(n), key=lambda i: -njac[i])
+    rank = {idx: r for r, idx in enumerate(order)}
+    best = njac[order[0]] if n else 0.0
+    second = njac[order[1]] if n > 1 else 0.0
+    # best name-jaccard among each source, to get "other source" cheaply
+    best_s2 = max((njac[j] for j in range(n) if not cand_s3[j]), default=0.0)
+    best_s3 = max((njac[j] for j in range(n) if cand_s3[j]), default=0.0)
+    n_log = math.log1p(n)
+    out = []
+    for i in range(n):
+        other_best = best_s2 if cand_s3[i] else best_s3
+        twin = 1.0 if (sigs[i] and len(sig_src.get(sigs[i], ())) >= 2) else 0.0
+        margin = njac[i] - (best if i != order[0] else second)
+        out.append([rank[i] / n if n else 0.0,
+                    1.0 if i == order[0] else 0.0,
+                    margin, other_best, twin, n_log])
+    return out
+
 
 def _trigrams(s: str):
     s = s.replace(" ", "")

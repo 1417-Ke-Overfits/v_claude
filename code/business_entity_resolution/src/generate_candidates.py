@@ -46,6 +46,8 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--gt", default=None, help="ground-truth tsv for recall eval (train)")
     ap.add_argument("--batch", type=int, default=4000)
+    ap.add_argument("--max-s1", type=int, default=0,
+                    help="only generate for the first M Source-1 rows (0 = all)")
     ap.add_argument("--nt_cap", type=int, default=10000)
     ap.add_argument("--at_cap", type=int, default=5000)
     ap.add_argument("--ns_cap", type=int, default=50000)
@@ -120,20 +122,22 @@ def main():
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     N = args.topn
+    n_s1 = len(id1) if not args.max_s1 else min(args.max_s1, len(id1))
     true_tot = cov = 0
     with open(args.out, "w", encoding="utf-8") as out:
         out.write("source1_entity_id\tcandidate_entity_ids\n")
-        for start in range(0, len(id1), args.batch):
-            end = min(start + args.batch, len(id1))
+        for start in range(0, n_s1, args.batch):
+            end = min(start + args.batch, n_s1)
             S = A[start:end] @ BT             # (b x M) csr, entries = shared idf score
             S = S.tocsr()
             for bi in range(end - start):
                 r = start + bi
                 lo, hi = S.indptr[bi], S.indptr[bi+1]
                 cols = S.indices[lo:hi]; scores = S.data[lo:hi]
-                if len(cols) > N:
-                    part = np.argpartition(scores, len(cols) - N)[-N:]
-                    cols = cols[part]
+                # keep the top-N by score, written in DESCENDING score order so a
+                # later stage can treat "top-K" as a simple truncation.
+                order = np.argsort(scores)[::-1][:N]
+                cols = cols[order]
                 cand_ids = [code_eid(g) for g in cols]
                 out.write(eid(1, id1[r]) + "\t" + ",".join(cand_ids) + "\n")
                 if gt is not None:

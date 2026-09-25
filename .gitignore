@@ -26,3 +26,4 @@ data/interim/
 # Trained model binaries (regenerable via train_model.py)
 models/xgb.json
 models/lgbm.txt
+models_rel/
