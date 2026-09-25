@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Dataset files (large raw data, provided separately — exceed GitHub's 100MB limit)
+dataset/train/*.tsv
+dataset/test/*.tsv
+*.tsv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
