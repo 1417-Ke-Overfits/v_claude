@@ -23,6 +23,7 @@ Design notes discovered during EDA:
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from functools import lru_cache
@@ -143,6 +144,20 @@ NAME_SYNONYMS = {
     "intnl": "international", "mfg": "manufacturing", "cie": "compagnie",
 }
 
+# Learned native-script -> English token dictionary (built by
+# build_translit_dict.py from ground-truth-aligned pairs; offline, provided-data
+# only). Corrects phonetic transliterations ("phuda"->"food", "hotala"->"hotel")
+# so native Indian names share tokens with their romanized S1 counterpart.
+_TRANSLIT_DICT = {}
+try:
+    import json as _json
+    _dp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translit_dict.json")
+    if os.path.isfile(_dp):
+        with open(_dp, encoding="utf-8") as _f:
+            _TRANSLIT_DICT = _json.load(_f)
+except Exception:
+    _TRANSLIT_DICT = {}
+
 
 _PHONE_RE = re.compile(r"[-+(]?\b\d[\d\s().-]{6,}\d\b")
 _DOMAIN_RE = re.compile(r"\b([a-z0-9][a-z0-9-]*)\.(?:com|net|org|io|co|in|us|biz|info|shop|store)\b", re.I)
@@ -178,6 +193,7 @@ def clean_name(raw: str):
     tokens = s.split()
     core, legal = [], []
     for t in tokens:
+        t = _TRANSLIT_DICT.get(t, t)          # learned native->English (phuda->food)
         t = NAME_SYNONYMS.get(t, t)           # fold abbreviations (Ets->etablissements)
         if t in LEGAL_TOKENS:
             legal.append(t)
