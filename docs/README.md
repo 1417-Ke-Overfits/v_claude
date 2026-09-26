@@ -24,6 +24,7 @@ Read in order for the full story, or jump to a topic:
 | 10 | [Feature Engineering](10_features.md) | The 29 pairwise features, labeled dataset construction, and feature-quality validation |
 | 11 | [Matching Model & F₀.₅ Tuning](11_matching_model.md) | Model bake-off (XGBoost 0.9206), honest macro-F₀.₅ eval, threshold, importances |
 | 12 | [Iteration Experiments](12_iteration_experiments.md) | N-sweep (no help), relative+cross-source features (+0.002), and the honest-vs-lenient eval reframe |
+| 13 | [Test Inference & Submission](13_submission.md) | Stage 8: test pipeline, matching_results.tsv (1.73M rows, PASS), submission zip |
 
 ## Project status
 
@@ -35,7 +36,7 @@ Read in order for the full story, or jump to a topic:
 | 3.5 Feature engineering | ✅ Complete (29 features; 10M train / 18M val rows) |
 | 4. Matching model (classifier) | ✅ XGBoost, macro F₀.₅ = 0.9206 (P 0.959 / R 0.849) |
 | 5. Threshold tuning for F₀.₅ | ✅ Global thr ≈ 0.99 (done in Stage 5 eval) |
-| 6. Test inference + submission package | 🔜 Next |
+| 6. Test inference + submission package | ✅ Complete — `output/matching_results.tsv` (1.73M rows) validated PASS; zip built |
 
 ## One-paragraph summary
 
