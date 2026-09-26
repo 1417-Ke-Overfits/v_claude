@@ -138,6 +138,28 @@ doesn't share the siblings' address is a likely false merge. Strong discriminato
 
 +0.0016 on US/India from sibling support; French gains apply on test only.
 
+## Experiment G — learned native-script dictionary (the India lever)
+
+`build_translit_dict.py` learns a phonetic→English token map from ground-truth
+aligned native pairs (offline, provided-data only): for each GT pair whose S2/S3
+record is native-script, align its romanized tokens to the S1 English tokens by
+Jaro-Winkler, keep the dominant mapping. **1,124 high-confidence entries**
+(`invesdhmendhs→investments`, `hotala→hotel`, `pharsta→first`,
+`sophtaveyara→software`, `marketimga→marketing`…). `normalize.py` applies it
+after `romanize()`.
+
+Proxy on 20k native GT pairs: name-token Jaccard **0.455 → 0.811**, zero-overlap
+**43.7% → 3.0%**. Full rebuild:
+
+| Version | F₀.₅ (US/India) | US | India | Recall |
+|---------|----------------:|---:|------:|-------:|
+| + French + sibling (F) | 0.9292 | 0.950 | 0.892 | 0.870 |
+| **+ learned dictionary (G)** | **0.9387** | **0.950** | **0.922** | **0.887** |
+
+**Biggest single lever: +0.0095**, driven by **India 0.892 → 0.922** (recall
+0.870 → 0.887). Note: the builder must romanize *raw* names (not the dict-cleaned
+`name_core`) or it feeds on its own output — fixed.
+
 ## Cumulative progress (honest macro F₀.₅)
 
 | Stage | F₀.₅ | Lenient | Recall |
@@ -146,12 +168,13 @@ doesn't share the siblings' address is a likely false merge. Strong discriminato
 | + relative feats | 0.9229 | — | 0.850 |
 | + cross-source + 250k | 0.9250 | 0.9444 | 0.868 |
 | + tuned XGBoost | 0.9276 | 0.9474 | 0.866 |
-| **+ French + sibling** | **0.9292** | **0.9491** | 0.870 |
+| + French + sibling | 0.9292 | 0.9491 | 0.870 |
+| **+ learned native-script dict** | **0.9387** | **0.9508** | 0.887 |
 
-Net (US/India val): **+0.0086 honest / +0.0068 lenient**, recall 0.849 → 0.870 at
-precision 0.96. Plus the French normalization, which improves the France test
-slice (invisible to US/India validation). Model `models_x2/xgb.json` regenerates
-the submission (`output/matching_results_v2.tsv`).
+Net (US/India val): **+0.0181 honest / +0.0085 lenient**, recall 0.849 → 0.887 at
+precision 0.968; **India 0.892 → 0.922**. Plus French normalization (improves the
+France test slice, invisible to US/India validation). Best model
+`models_x3/xgb.json` → submission `output/matching_results_v3.tsv`.
 
 ### Still on the table (not yet done)
 - **Reverse-direction blocking** (teammate: recall 0.971→0.982) — S2/S3 records
