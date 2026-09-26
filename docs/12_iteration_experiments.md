@@ -99,6 +99,31 @@ important shift is **recall 0.849 → 0.868 at held precision** — corroboratio
 pushes borderline true matches over the threshold, as intended. Gains are
 monotonic but incremental; India remains the hardest country.
 
+## Experiment E — XGBoost hyperparameter tuning
+
+On the Exp D feature set (no rebuild — model-only), swept XGBoost configs:
+
+| Config | F₀.₅ | Precision | Recall | India |
+|--------|-----:|----------:|-------:|------:|
+| d8 / 300 (previous) | 0.9250 | 0.958 | 0.868 | 0.892 |
+| **d10 / 600 / min_child_weight=5 / eta 0.1** | **0.9276** | 0.962 | 0.866 | 0.897 |
+| d12 / 500 / mcw10 | 0.9261 | 0.959 | 0.871 | 0.895 |
+
+Deeper + slower + mildly regularised is best; d12 starts to over-fit. Adopted
+**d10/600/mcw5** as the production config. Lenient F₀.₅ = **0.9474**.
+
+## Cumulative progress (honest macro F₀.₅)
+
+| Stage | F₀.₅ | Lenient | Recall |
+|-------|-----:|--------:|-------:|
+| Base model (29 feats) | 0.9206 | 0.9423 | 0.849 |
+| + relative feats | 0.9229 | — | 0.850 |
+| + cross-source + 250k | 0.9250 | 0.9444 | 0.868 |
+| **+ tuned XGBoost** | **0.9276** | **0.9474** | 0.866 |
+
+Net: **+0.0070 honest / +0.0051 lenient**, recall 0.849 → 0.866 at precision
+0.96. The tuned + cross-source model is used to regenerate the submission.
+
 ---
 
 ## Where we stand after Stage 7
