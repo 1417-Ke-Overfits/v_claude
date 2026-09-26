@@ -19,26 +19,39 @@ import pyarrow.parquet as pq
 from rapidfuzz.distance import JaroWinkler
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from normalize import romanize, strip_accents, LEGAL_TOKENS  # noqa: E402
+import re as _re
 PROC = "data/processed"
+
+
+def phonetic_tokens(raw):
+    """Phonetic tokens of a raw name BEFORE the learned dict is applied — so the
+    dictionary can be rebuilt reproducibly even after data was cleaned with it."""
+    s = strip_accents(romanize(raw or "")).lower()
+    s = _re.sub(r"[^a-z0-9\s]", " ", s)
+    return [t for t in s.split() if t and t not in LEGAL_TOKENS and not t.isdigit()]
 GT = "dataset/train/train_ground_truth.tsv"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translit_dict.json")
 MIN_JW = 0.55          # only record an alignment this similar or better
 MIN_SUPPORT = 8        # phonetic token must be seen >= this many times
 MIN_FRACTION = 0.45    # dominant English target must win >= this share
+# Only correct tokens that look non-English (phonetic transliteration artifacts),
+# never map one English word to another (avoids "management"->"investment").
 t0 = time.time(); log = lambda m: print(f"[{time.time()-t0:.0f}s] {m}", flush=True)
 
 
 def load_names(src, need_native):
-    """id_num -> (core_token_list, is_native)."""
+    """id_num -> (phonetic_token_list, is_native). Uses RAW names + romanize so
+    it is independent of whether the parquet was cleaned with the dict."""
     t = pq.read_table(f"{PROC}/{src}.parquet",
-                      columns=["entity_id", "name_core", "is_native"])
+                      columns=["entity_id", "raw_name", "is_native"])
     d = {}
-    for e, nc, nat in zip(t.column("entity_id").to_pylist(),
-                          t.column("name_core").to_pylist(),
+    for e, rn, nat in zip(t.column("entity_id").to_pylist(),
+                          t.column("raw_name").to_pylist(),
                           t.column("is_native").to_pylist()):
         if need_native and not nat:
             continue
-        d[int(e.split('-', 1)[1])] = (nc.split() if nc else [], bool(nat))
+        d[int(e.split('-', 1)[1])] = (phonetic_tokens(rn), bool(nat))
     return d
 
 
