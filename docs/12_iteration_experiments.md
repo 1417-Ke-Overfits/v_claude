@@ -73,6 +73,32 @@ We compute F₀.₅ two ways on the same predictions:
 action item is to **confirm the teammate's methodology** (and whether France is
 included) before treating the gap as a real model deficit.
 
+## Experiment D — true cross-source corroboration + more training data
+
+**Hypothesis:** the residual recall gap (India native-script / weak-address
+cases) can be closed by *corroboration*: a candidate that barely matches S1
+directly should be accepted if it agrees with a confident cross-source match of
+the same S1.
+
+**Added 3 features** (computed per S1 in O(k) via a "best other-source anchor"):
+`xsrc_name_agree`, `xsrc_addr_agree`, `xsrc_anchor_s1sim` — the candidate's
+name/address agreement with the other source's most-S1-similar candidate.
+Also retrained on **250k** S1 (vs 150k in Exp B).
+
+**Feature quality** (val): `xsrc_name_agree` 0.684 vs 0.256, `xsrc_addr_agree`
+0.466 vs 0.092 — strong new discriminators.
+
+| Version | F₀.₅ (honest) | Precision | Recall | India |
+|---------|--------------:|----------:|-------:|------:|
+| Base (29 feats) | 0.9206 | 0.959 | 0.849 | — |
+| + relative (Exp B) | 0.9229 | 0.961 | 0.850 | 0.890 |
+| **+ cross-source + 250k (Exp D)** | **0.9250** | 0.958 | **0.868** | 0.892 |
+
+**Result:** honest F₀.₅ 0.9229 → **0.9250**; lenient 0.9423 → **0.9444**. The
+important shift is **recall 0.849 → 0.868 at held precision** — corroboration
+pushes borderline true matches over the threshold, as intended. Gains are
+monotonic but incremental; India remains the hardest country.
+
 ---
 
 ## Where we stand after Stage 7

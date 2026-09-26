@@ -48,16 +48,22 @@ N_FEATURES = len(FEATURE_NAMES)
 REL_FEATURE_NAMES = [
     "namejac_rank", "is_top_namejac", "namejac_margin",
     "other_src_best", "cross_twin", "n_cands_log",
+    # true cross-source corroboration: agreement of this candidate with the
+    # OTHER source's most-S1-similar candidate (the "anchor"). A native-script
+    # S2 record that barely matches S1 directly is corroborated when it agrees
+    # with a confident S3 match of the same S1 (and vice-versa).
+    "xsrc_name_agree", "xsrc_addr_agree", "xsrc_anchor_s1sim",
 ]
 ALL_FEATURE_NAMES = FEATURE_NAMES + REL_FEATURE_NAMES
 
 
-def compute_relative(a_core, cand_cores, cand_s3):
+def compute_relative(a_core, cand_cores, cand_addrs, cand_s3):
     """Relative/competitive + cross-source features over ALL of one S1's
-    candidates, computed from cheap core-token sets only (no full prep needed).
+    candidates, computed from cheap token sets only (no full prep needed).
 
     a_core     : S1 core token frozenset
     cand_cores : list of each candidate's core token frozenset
+    cand_addrs : list of each candidate's address token frozenset
     cand_s3    : list of bools (candidate is from Source 3)
     Returns a list of REL feature vectors aligned to the candidates.
     """
@@ -75,18 +81,35 @@ def compute_relative(a_core, cand_cores, cand_s3):
     rank = {idx: r for r, idx in enumerate(order)}
     best = njac[order[0]] if n else 0.0
     second = njac[order[1]] if n > 1 else 0.0
-    # best name-jaccard among each source, to get "other source" cheaply
-    best_s2 = max((njac[j] for j in range(n) if not cand_s3[j]), default=0.0)
-    best_s3 = max((njac[j] for j in range(n) if cand_s3[j]), default=0.0)
+    # the most-S1-similar candidate FROM EACH SOURCE (the cross-source "anchor").
+    bs2 = bs3 = -1
+    for i in range(n):
+        if cand_s3[i]:
+            if bs3 < 0 or njac[i] > njac[bs3]:
+                bs3 = i
+        else:
+            if bs2 < 0 or njac[i] > njac[bs2]:
+                bs2 = i
+    best_s2 = njac[bs2] if bs2 >= 0 else 0.0
+    best_s3 = njac[bs3] if bs3 >= 0 else 0.0
     n_log = math.log1p(n)
     out = []
     for i in range(n):
         other_best = best_s2 if cand_s3[i] else best_s3
         twin = 1.0 if (sigs[i] and len(sig_src.get(sigs[i], ())) >= 2) else 0.0
         margin = njac[i] - (best if i != order[0] else second)
+        # cross-source corroboration vs the OTHER source's anchor
+        anchor = bs2 if cand_s3[i] else bs3
+        if anchor >= 0 and anchor != i:
+            xname = _jac(cand_cores[i], cand_cores[anchor])
+            xaddr = _jac(cand_addrs[i], cand_addrs[anchor])
+            xanch = njac[anchor]
+        else:
+            xname = xaddr = xanch = 0.0
         out.append([rank[i] / n if n else 0.0,
                     1.0 if i == order[0] else 0.0,
-                    margin, other_best, twin, n_log])
+                    margin, other_best, twin, n_log,
+                    xname, xaddr, xanch])
     return out
 
 

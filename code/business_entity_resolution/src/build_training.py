@@ -122,10 +122,12 @@ def main():
                 (rows2_all if c[1] == '2' else rows3_all).append(int(c.split('-', 1)[1]))
         u2 = sorted(set(row2[n] for n in rows2_all))
         u3 = sorted(set(row3[n] for n in rows3_all))
-        nc2 = dict(zip(u2, t2.take(pa.array(u2)).column("name_core").to_pylist())) if u2 else {}
-        nc3 = dict(zip(u3, t3.take(pa.array(u3)).column("name_core").to_pylist())) if u3 else {}
-        core2 = {r: core_set(v) for r, v in nc2.items()}
-        core3 = {r: core_set(v) for r, v in nc3.items()}
+        sub2 = t2.take(pa.array(u2)).to_pydict() if u2 else {"name_core": [], "addr_canon": []}
+        sub3 = t3.take(pa.array(u3)).to_pydict() if u3 else {"name_core": [], "addr_canon": []}
+        core2 = {r: core_set(v) for r, v in zip(u2, sub2["name_core"])}
+        core3 = {r: core_set(v) for r, v in zip(u3, sub3["name_core"])}
+        addr2 = {r: core_set(v) for r, v in zip(u2, sub2["addr_canon"])}
+        addr3 = {r: core_set(v) for r, v in zip(u3, sub3["addr_canon"])}
 
         # --- decide WRITTEN candidates and full-prep only those ---
         need1 = [row1[s1num] for _, s1num, _, _, _ in chunk]
@@ -153,15 +155,17 @@ def main():
 
         for s1, s1num, is_val, gtset, cands, sset in writes:
             a = P1[row1[s1num]]
-            # relative features over ALL candidates (cheap core sets)
-            cand_cores, cand_s3 = [], []
+            # relative features over ALL candidates (cheap core + addr sets)
+            cand_cores, cand_addrs, cand_s3 = [], [], []
             for c in cands:
                 num = int(c.split('-', 1)[1])
                 if c[1] == '2':
-                    cand_cores.append(core2.get(row2[num], frozenset())); cand_s3.append(False)
+                    cand_cores.append(core2.get(row2[num], frozenset()))
+                    cand_addrs.append(addr2.get(row2[num], frozenset())); cand_s3.append(False)
                 else:
-                    cand_cores.append(core3.get(row3[num], frozenset())); cand_s3.append(True)
-            rel = compute_relative(a["core"], cand_cores, cand_s3)
+                    cand_cores.append(core3.get(row3[num], frozenset()))
+                    cand_addrs.append(addr3.get(row3[num], frozenset())); cand_s3.append(True)
+            rel = compute_relative(a["core"], cand_cores, cand_addrs, cand_s3)
             kind = "val" if is_val else "train"
             for i, c in enumerate(cands):
                 if c not in sset:

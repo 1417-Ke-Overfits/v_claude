@@ -87,10 +87,12 @@ def main():
         r2a = [int(c.split('-', 1)[1]) for _, _, cands in chunk for c in cands if c[1] == '2']
         r3a = [int(c.split('-', 1)[1]) for _, _, cands in chunk for c in cands if c[1] == '3']
         u2 = sorted(set(row2[n] for n in r2a)); u3 = sorted(set(row3[n] for n in r3a))
-        nc2 = dict(zip(u2, t2.take(pa.array(u2)).column("name_core").to_pylist())) if u2 else {}
-        nc3 = dict(zip(u3, t3.take(pa.array(u3)).column("name_core").to_pylist())) if u3 else {}
-        core2 = {r: core_set(v) for r, v in nc2.items()}
-        core3 = {r: core_set(v) for r, v in nc3.items()}
+        sub2 = t2.take(pa.array(u2)).to_pydict() if u2 else {"name_core": [], "addr_canon": []}
+        sub3 = t3.take(pa.array(u3)).to_pydict() if u3 else {"name_core": [], "addr_canon": []}
+        core2 = {r: core_set(v) for r, v in zip(u2, sub2["name_core"])}
+        core3 = {r: core_set(v) for r, v in zip(u3, sub3["name_core"])}
+        addr2 = {r: core_set(v) for r, v in zip(u2, sub2["addr_canon"])}
+        addr3 = {r: core_set(v) for r, v in zip(u3, sub3["addr_canon"])}
         # full prep for S1 + only the TOP-`cap` candidates we actually score
         need1 = sorted(set(row1[s1num] for _, s1num, _ in chunk))
         sc2 = sorted(set(row2[int(c.split('-', 1)[1])]
@@ -104,14 +106,16 @@ def main():
         feats = []; index = []  # index: (chunk_pos, cand_str)
         for ci, (s1, s1num, cands) in enumerate(chunk):
             a = P1[row1[s1num]]
-            cand_cores, cand_s3 = [], []
+            cand_cores, cand_addrs, cand_s3 = [], [], []
             for c in cands:
                 num = int(c.split('-', 1)[1])
                 if c[1] == '2':
-                    cand_cores.append(core2.get(row2[num], frozenset())); cand_s3.append(False)
+                    cand_cores.append(core2.get(row2[num], frozenset()))
+                    cand_addrs.append(addr2.get(row2[num], frozenset())); cand_s3.append(False)
                 else:
-                    cand_cores.append(core3.get(row3[num], frozenset())); cand_s3.append(True)
-            rel = compute_relative(a["core"], cand_cores, cand_s3)  # over FULL set
+                    cand_cores.append(core3.get(row3[num], frozenset()))
+                    cand_addrs.append(addr3.get(row3[num], frozenset())); cand_s3.append(True)
+            rel = compute_relative(a["core"], cand_cores, cand_addrs, cand_s3)  # over FULL set
             for i, c in enumerate(cands[:cap]):                     # score only top-cap
                 num = int(c.split('-', 1)[1])
                 b = P2[row2[num]] if c[1] == '2' else P3[row3[num]]

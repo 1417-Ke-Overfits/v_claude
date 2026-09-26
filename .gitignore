@@ -27,3 +27,10 @@ data/interim/
 models/xgb.json
 models/lgbm.txt
 models_rel/
+
+# Submission artifacts (large, regenerable)
+submission_pkg/
+*_submission.zip
+zi*
+models_x/
+output/cand_train_sub.tsv
