@@ -112,6 +112,32 @@ On the Exp D feature set (no rebuild — model-only), swept XGBoost configs:
 Deeper + slower + mildly regularised is best; d12 starts to over-fit. Adopted
 **d10/600/mcw5** as the production config. Lenient F₀.₅ = **0.9474**.
 
+## Experiment F — teammate-inspired: French normalization + sibling support
+
+A teammate's pipeline scored higher (public F₀.₅ ~0.96); their diagnosis pointed
+to concrete gaps we adopted:
+
+**French normalization** (`normalize.py`): apostrophe-join (`L'Épicerie`→`lepicerie`),
+`N°`/`numéro` drop, **département→région** map (`Gironde`→`nouvelleaquitaine`,
+`Nord`→`hautsdefrance`, full metropolitan list), French legal forms
+(EI/EIRL/EARL/GAEC/SELAS/SEM/SCOP…), name-abbrev synonyms (`Ets`→`etablissements`).
+These only affect the **France test slice** (France is absent from training), so
+they do **not** show in our US/India validation — but the teammate estimated
+France was dragging ~0.012, so this should help the leaderboard.
+
+**Sibling-support features** (`features.py`): `sib_name_support`,
+`sib_addr_support` — a candidate's name/address agreement with the S1's *other*
+confident candidates. Same real business ⇒ same address, so a look-alike that
+doesn't share the siblings' address is a likely false merge. Strong discriminators
+(sib_addr_support 0.729 vs 0.158). This is the teammate's top precision lever.
+
+| Version | F₀.₅ (US/India val) | Lenient | Recall |
+|---------|--------------------:|--------:|-------:|
+| + tuned XGBoost (Exp E) | 0.9276 | 0.9474 | 0.866 |
+| **+ French + sibling (Exp F)** | **0.9292** | **0.9491** | 0.870 |
+
++0.0016 on US/India from sibling support; French gains apply on test only.
+
 ## Cumulative progress (honest macro F₀.₅)
 
 | Stage | F₀.₅ | Lenient | Recall |
@@ -119,10 +145,21 @@ Deeper + slower + mildly regularised is best; d12 starts to over-fit. Adopted
 | Base model (29 feats) | 0.9206 | 0.9423 | 0.849 |
 | + relative feats | 0.9229 | — | 0.850 |
 | + cross-source + 250k | 0.9250 | 0.9444 | 0.868 |
-| **+ tuned XGBoost** | **0.9276** | **0.9474** | 0.866 |
+| + tuned XGBoost | 0.9276 | 0.9474 | 0.866 |
+| **+ French + sibling** | **0.9292** | **0.9491** | 0.870 |
 
-Net: **+0.0070 honest / +0.0051 lenient**, recall 0.849 → 0.866 at precision
-0.96. The tuned + cross-source model is used to regenerate the submission.
+Net (US/India val): **+0.0086 honest / +0.0068 lenient**, recall 0.849 → 0.870 at
+precision 0.96. Plus the French normalization, which improves the France test
+slice (invisible to US/India validation). Model `models_x2/xgb.json` regenerates
+the submission (`output/matching_results_v2.tsv`).
+
+### Still on the table (not yet done)
+- **Reverse-direction blocking** (teammate: recall 0.971→0.982) — S2/S3 records
+  also nominate their top S1; rescues generic-name cases.
+- **Learned native-script dictionary** for India (their approach) vs our library
+  transliteration — likely the biggest remaining India lever (our India 0.897 vs
+  their ~0.974).
+- **Two-stage conflict re-ranker + one-to-one assignment** (their precision lever).
 
 ---
 
