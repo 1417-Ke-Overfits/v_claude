@@ -141,14 +141,14 @@ def main():
     # ---- XGBoost ----
     import xgboost as xgb
     dtr = xgb.DMatrix(Xtr, label=ytr, feature_names=FEATURE_NAMES)
-    # tuned config (see docs/12 Exp E): deeper + slower + regularised beat the
-    # d8/300 baseline (F0.5 0.9250 -> 0.9276) on the held-out set.
-    params = dict(max_depth=10, eta=0.1, subsample=0.8, colsample_bytree=0.8,
-                  min_child_weight=5, objective="binary:logistic",
+    # tuned config (docs/12 Exp E + round sweep): d11 / 1000 rounds / eta 0.07 /
+    # min_child_weight 8 was the round-sweep winner (F0.5 0.9398 on x3 features).
+    params = dict(max_depth=11, eta=0.07, subsample=0.8, colsample_bytree=0.8,
+                  min_child_weight=8, objective="binary:logistic",
                   eval_metric="aucpr", scale_pos_weight=pos_w,
                   tree_method="hist", nthread=0)
     t = time.time()
-    bst = xgb.train(params, dtr, num_boost_round=600)
+    bst = xgb.train(params, dtr, num_boost_round=1000)
     log(f"XGBoost trained in {time.time()-t:.0f}s")
     sc = bst.predict(xgb.DMatrix(Xva, feature_names=FEATURE_NAMES))
     macro, thr, curve, ng = evaluate("XGBoost", sc, val_tbl, gt_full, s1c, thresholds)
