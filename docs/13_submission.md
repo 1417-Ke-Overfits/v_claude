@@ -51,6 +51,25 @@ training singleton rate (5.6%), and 3.57 matches/S1 matches the training average
 (~3.46–3.67) — strong signs the model transfers well to test (including the
 unseen France records, handled by the country-agnostic pipeline).
 
+## 3b. Model versions & the inference-cost tradeoff
+
+The **submitted** `matching_results.tsv` was generated with the Stage-5/rel model
+(`models_rel/xgb.json`, held-out F₀.₅ **0.9229**). Stage-7 iteration produced a
+**better model** (`models_x/xgb.json`, cross-source features + tuning, held-out
+F₀.₅ **0.9276** / lenient 0.9474).
+
+Regenerating the submission with the improved model is a **long inference run**:
+the tuned model has 600 deep trees (vs 300 shallow), so full-test scoring is
+~2–3× slower (~5 h). Because the leaderboard gain is modest (~+0.005 F₀.₅), the
+practical plan is: **submit v1 now for a real score**, then optionally regenerate
+with the improved model as an overnight batch:
+
+```bash
+python src/predict.py --candidates output/candidate_pairs.tsv --split test \
+    --model models_x/xgb.json --out output/matching_results.tsv \
+    --threshold 0.994 --cand-cap 60          # ~5 h; then re-zip
+```
+
 ## 4. Expected score
 
 Held-out validation gave macro **F₀.₅ = 0.9226** (honest) / **0.9423**
