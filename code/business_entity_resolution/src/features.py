@@ -53,6 +53,11 @@ REL_FEATURE_NAMES = [
     # S2 record that barely matches S1 directly is corroborated when it agrees
     # with a confident S3 match of the same S1 (and vice-versa).
     "xsrc_name_agree", "xsrc_addr_agree", "xsrc_anchor_s1sim",
+    # sibling support: how well this candidate agrees (name/address) with the
+    # S1's OTHER most-confident candidates (any source). Same real business =>
+    # same address; a look-alike that does NOT share the siblings' address is a
+    # likely false merge. Reduces false merges (esp. generic French names).
+    "sib_name_support", "sib_addr_support",
 ]
 ALL_FEATURE_NAMES = FEATURE_NAMES + REL_FEATURE_NAMES
 
@@ -93,6 +98,7 @@ def compute_relative(a_core, cand_cores, cand_addrs, cand_s3):
     best_s2 = njac[bs2] if bs2 >= 0 else 0.0
     best_s3 = njac[bs3] if bs3 >= 0 else 0.0
     n_log = math.log1p(n)
+    top_conf = order[:4]   # the S1's most-confident candidates (its "siblings")
     out = []
     for i in range(n):
         other_best = best_s2 if cand_s3[i] else best_s3
@@ -106,10 +112,17 @@ def compute_relative(a_core, cand_cores, cand_addrs, cand_s3):
             xanch = njac[anchor]
         else:
             xname = xaddr = xanch = 0.0
+        # sibling support: agreement with the S1's confident siblings (any source)
+        sib_name = sib_addr = 0.0
+        for j in top_conf:
+            if j == i:
+                continue
+            sib_name = max(sib_name, _jac(cand_cores[i], cand_cores[j]))
+            sib_addr = max(sib_addr, _jac(cand_addrs[i], cand_addrs[j]))
         out.append([rank[i] / n if n else 0.0,
                     1.0 if i == order[0] else 0.0,
                     margin, other_best, twin, n_log,
-                    xname, xaddr, xanch])
+                    xname, xaddr, xanch, sib_name, sib_addr])
     return out
 
 

@@ -116,6 +116,7 @@ LEGAL_TOKENS = {
     "llp", "ltd", "limited", "pvt", "private", "plc", "pc", "pllc", "lp",
     # France entity types
     "sarl", "sas", "sasu", "sa", "eurl", "sci", "snc", "scp", "selarl", "gie",
+    "ei", "eirl", "earl", "gaec", "selas", "sem", "scop", "scic", "sca",
     # generic international entity types
     "gmbh", "ag", "bv", "nv", "srl", "spa", "oy", "ab", "as", "kk",
     # pure stopwords
@@ -132,6 +133,15 @@ def _fold_ampersand(s: str) -> str:
     """Unify '&', '+', ' and ' so 'A & B' == 'A and B' == 'A + B'."""
     s = s.replace("&", " and ").replace("+", " and ")
     return s
+
+
+# Name-token abbreviation synonyms (mostly French/English), folded to a canonical
+# form so e.g. "Ets" and "Établissements" match.
+NAME_SYNONYMS = {
+    "ets": "etablissements", "etabl": "etablissements", "etab": "etablissements",
+    "asso": "association", "assoc": "association", "intl": "international",
+    "intnl": "international", "mfg": "manufacturing", "cie": "compagnie",
+}
 
 
 _PHONE_RE = re.compile(r"[-+(]?\b\d[\d\s().-]{6,}\d\b")
@@ -160,6 +170,7 @@ def clean_name(raw: str):
     if m:
         s = s.replace(m.group(0), " " + m.group(1) + " ")
     s = _fold_ampersand(s)
+    s = s.replace("'", "").replace("’", "")  # JOIN apostrophes: L'Epicerie->lepicerie, Moyna's->moynas
     s = _PHONE_RE.sub(" ", s)                 # drop appended phone numbers
     s = re.sub(r"[^a-z0-9\s]", " ", s)        # punctuation -> space
     s = _WS_RE.sub(" ", s).strip()
@@ -167,6 +178,7 @@ def clean_name(raw: str):
     tokens = s.split()
     core, legal = [], []
     for t in tokens:
+        t = NAME_SYNONYMS.get(t, t)           # fold abbreviations (Ets->etablissements)
         if t in LEGAL_TOKENS:
             legal.append(t)
         else:
@@ -241,10 +253,73 @@ _FR_FULL = {
     "nouvelleaquitaine", "hautsdefrance", "iledefrance", "occitanie",
     "grandest", "normandie", "bretagne", "paysdelaloire", "centrevaldeloire",
     "bourgognefranchecomte", "provencealpescotedazur", "auvergnerhonealpes",
-    "corse", "nord", "gironde",
+    "corse",
 }
 for f in _FR_FULL:
     _STATE_MAP[f] = f
+
+# French DÉPARTEMENT -> RÉGION. S1 tends to carry the région ("Nouvelle-Aquitaine")
+# while S2/S3 carry the département ("Gironde", "Nord"); mapping both to the région
+# makes them normalize identically (same idea as US state abbrev -> full).
+_FR_DEPT_TO_REGION = {
+    # Nouvelle-Aquitaine
+    "gironde": "nouvelleaquitaine", "dordogne": "nouvelleaquitaine",
+    "landes": "nouvelleaquitaine", "pyreneesatlantiques": "nouvelleaquitaine",
+    "charente": "nouvelleaquitaine", "charentemaritime": "nouvelleaquitaine",
+    "viennent": "nouvelleaquitaine", "vienne": "nouvelleaquitaine",
+    "deuxsevres": "nouvelleaquitaine", "correze": "nouvelleaquitaine",
+    "creuse": "nouvelleaquitaine", "hautevienne": "nouvelleaquitaine",
+    "lotetgaronne": "nouvelleaquitaine",
+    # Hauts-de-France
+    "nord": "hautsdefrance", "pasdecalais": "hautsdefrance",
+    "somme": "hautsdefrance", "aisne": "hautsdefrance", "oise": "hautsdefrance",
+    # Île-de-France
+    "paris": "iledefrance", "seineetmarne": "iledefrance",
+    "yvelines": "iledefrance", "essonne": "iledefrance",
+    "hautsdeseine": "iledefrance", "seinesaintdenis": "iledefrance",
+    "valdemarne": "iledefrance", "valdoise": "iledefrance",
+    # Occitanie
+    "hautegaronne": "occitanie", "herault": "occitanie", "gard": "occitanie",
+    "aude": "occitanie", "tarn": "occitanie", "gers": "occitanie",
+    "lot": "occitanie", "aveyron": "occitanie", "lozere": "occitanie",
+    "pyreneesorientales": "occitanie", "hautespyrenees": "occitanie",
+    "ariege": "occitanie", "tarnetgaronne": "occitanie",
+    # Auvergne-Rhône-Alpes
+    "rhone": "auvergnerhonealpes", "isere": "auvergnerhonealpes",
+    "loire": "auvergnerhonealpes", "ain": "auvergnerhonealpes",
+    "drome": "auvergnerhonealpes", "ardeche": "auvergnerhonealpes",
+    "puydedome": "auvergnerhonealpes", "hautesavoie": "auvergnerhonealpes",
+    "savoie": "auvergnerhonealpes", "allier": "auvergnerhonealpes",
+    "cantal": "auvergnerhonealpes", "hauteloire": "auvergnerhonealpes",
+    # Provence-Alpes-Côte d'Azur
+    "bouchesdurhone": "provencealpescotedazur", "var": "provencealpescotedazur",
+    "alpesmaritimes": "provencealpescotedazur", "vaucluse": "provencealpescotedazur",
+    "alpesdehauteprovence": "provencealpescotedazur", "hautesalpes": "provencealpescotedazur",
+    # Grand Est
+    "basrhin": "grandest", "hautrhin": "grandest", "moselle": "grandest",
+    "meurtheetmoselle": "grandest", "marne": "grandest", "aube": "grandest",
+    "vosges": "grandest", "ardennes": "grandest", "meuse": "grandest", "hautemarne": "grandest",
+    # Bretagne
+    "finistere": "bretagne", "morbihan": "bretagne", "cotesdarmor": "bretagne",
+    "illeetvilaine": "bretagne",
+    # Pays de la Loire
+    "loireatlantique": "paysdelaloire", "maineetloire": "paysdelaloire",
+    "vendee": "paysdelaloire", "sarthe": "paysdelaloire", "mayenne": "paysdelaloire",
+    # Normandie
+    "seinemaritime": "normandie", "calvados": "normandie", "manche": "normandie",
+    "eure": "normandie", "orne": "normandie",
+    # Bourgogne-Franche-Comté
+    "cotedor": "bourgognefranchecomte", "saoneetloire": "bourgognefranchecomte",
+    "doubs": "bourgognefranchecomte", "yonne": "bourgognefranchecomte",
+    "nievre": "bourgognefranchecomte", "jura": "bourgognefranchecomte",
+    "hautesaone": "bourgognefranchecomte", "territoiredebelfort": "bourgognefranchecomte",
+    # Centre-Val de Loire
+    "loiret": "centrevaldeloire", "indreetloire": "centrevaldeloire",
+    "loiretcher": "centrevaldeloire", "cher": "centrevaldeloire",
+    "eureetloir": "centrevaldeloire", "indre": "centrevaldeloire",
+}
+_STATE_MAP.update(_FR_DEPT_TO_REGION)
+_FR_FULL |= set(_FR_DEPT_TO_REGION.values())
 
 # Romanized-native-script variants -> canonical. When an Indic state name is
 # written in its own script (e.g. "தமிழ்நாடு", "महाराष्ट्र"), romanize() yields a
@@ -310,7 +385,8 @@ _STREET_ABBR = {
     "pkwy": "parkway", "apt": "apartment", "ste": "suite", "fl": "floor",
     "rue": "rue", "r": "rue", "bd": "boulevard",
 }
-_STOP_ADDR = {"null", "na", "none", "po", "box", "pobox", "no", "number", "door", "th", "nd", "rd", "st"}
+_STOP_ADDR = {"null", "na", "none", "po", "box", "pobox", "no", "number", "door",
+              "th", "nd", "rd", "st", "numero", "num", "ndeg", "deg"}
 # NOTE: "rd"/"st" appear in both street-abbr and ordinal-suffix contexts; the
 # street-abbr map wins (applied first), so these stopwords only catch leftovers.
 
@@ -330,6 +406,8 @@ def clean_address(raw: str, country: str = ""):
         raw = ""
     s = romanize(raw)
     s = strip_accents(s).lower()
+    s = s.replace("'", "").replace("’", "")   # join apostrophes (l'eglise->leglise)
+    s = re.sub(r"n\s*[°o]\s*(?=\d)", " ", s)   # drop "N°"/"No" before a number
 
     # Find the state/region by scanning ALL comma-separated fields (addresses
     # are frequently reordered, so it is not always last). Prefer the last

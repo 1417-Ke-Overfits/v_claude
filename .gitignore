@@ -34,3 +34,4 @@ submission_pkg/
 zi*
 models_x/
 output/cand_train_sub.tsv
+models_x2/
